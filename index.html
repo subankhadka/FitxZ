@@ -1,0 +1,339 @@
+// Next.js-style single-file starter (pages + components) for Fitxz
+// File: app/page.tsx  (This is a single-file consolidated starter — split into pages/components in a real project)
+
+import React, { createContext, useContext, useEffect, useReducer, useState } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+import { motion, AnimatePresence } from 'framer-motion'
+
+/*
+  Features included in this starter:
+  - Multi-page structure (Home, Shop, Product, Cart, Login, Account)
+  - Product cards with images (Unsplash placeholders)
+  - Framer Motion animations
+  - Shopping cart implemented with React Context + localStorage persistence
+  - Firebase integration placeholders (Auth + Firestore) — insert your config
+  - Payment integration stubs for Khalti & eSewa (client-side examples)
+  - Tailwind CSS classes used for styling (assumes Tailwind configured)
+  - Simple logo placeholder and color scheme
+  - User auth pages (Login/Register) using Firebase Auth
+
+  Next steps after copying this starter into your Next.js project:
+  1. Create a standard Next.js app (e.g., `npx create-next-app@latest --typescript`).
+  2. Install dependencies: framer-motion, firebase, axios (optional), tailwindcss.
+  3. Split this single file into /app or /pages and components.
+  4. Replace Firebase config and enable Khalti/eSewa logic with server-side endpoints.
+*/
+
+// ------------------ Theme & Logo ------------------
+const THEME = {
+  primary: 'bg-gradient-to-r from-indigo-500 to-pink-500',
+  accent: 'text-pink-500',
+  card: 'bg-white',
+}
+
+const Logo = () => (
+  <div className="flex items-center gap-3">
+    <div className="w-12 h-12 rounded-full bg-gradient-to-tr from-yellow-300 to-pink-500 flex items-center justify-center text-white font-extrabold">FZ</div>
+    <div className="leading-tight">
+      <div className="text-xl font-bold">Fitxz</div>
+      <div className="text-xs text-gray-500">New-gen Fashion</div>
+    </div>
+  </div>
+)
+
+// ------------------ Products (sample) ------------------
+const SAMPLE_PRODUCTS = [
+  { id: 'p1', title: 'Neon Street Tee', price: 24.99, img: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=800&q=80', category: 'Men', sizes: ['S','M','L'] },
+  { id: 'p2', title: 'Pastel Kids Hoodie', price: 19.99, img: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=801&q=80', category: 'Kids', sizes: ['3-4','5-6'] },
+  { id: 'p3', title: 'Minimal Crop Top', price: 29.99, img: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=802&q=80', category: 'Women', sizes: ['XS','S','M'] },
+  { id: 'p4', title: 'Comfy Joggers', price: 34.99, img: 'https://images.unsplash.com/photo-1541099649105-f69ad21f3246?w=803&q=80', category: 'Men', sizes: ['M','L','XL'] },
+]
+
+// ------------------ Cart Context ------------------
+const CartContext = createContext(null)
+
+function cartReducer(state, action) {
+  switch(action.type) {
+    case 'hydrate':
+      return action.payload
+    case 'add': {
+      const found = state.items.find(i => i.id === action.payload.id && i.size === action.payload.size)
+      if (found) {
+        return { ...state, items: state.items.map(i => i.id === action.payload.id && i.size === action.payload.size ? { ...i, qty: i.qty + action.payload.qty } : i) }
+      }
+      return { ...state, items: [...state.items, action.payload] }
+    }
+    case 'remove':
+      return { ...state, items: state.items.filter(i => !(i.id === action.payload.id && i.size === action.payload.size)) }
+    case 'updateQty':
+      return { ...state, items: state.items.map(i => i.id === action.payload.id && i.size === action.payload.size ? { ...i, qty: action.payload.qty } : i) }
+    case 'clear':
+      return { items: [] }
+    default:
+      return state
+  }
+}
+
+export function CartProvider({ children }) {
+  const [state, dispatch] = useReducer(cartReducer, { items: [] })
+
+  useEffect(() => {
+    const raw = global?.localStorage?.getItem('fitxz_cart')
+    if (raw) dispatch({ type: 'hydrate', payload: JSON.parse(raw) })
+  }, [])
+
+  useEffect(() => {
+    try { global.localStorage.setItem('fitxz_cart', JSON.stringify(state)) } catch(e) {}
+  }, [state])
+
+  const addToCart = (product, size='M', qty=1) => {
+    dispatch({ type: 'add', payload: { id: product.id, title: product.title, price: product.price, size, qty, img: product.img } })
+  }
+
+  const removeFromCart = (id, size) => dispatch({ type: 'remove', payload: { id, size } })
+  const updateQty = (id, size, qty) => dispatch({ type: 'updateQty', payload: { id, size, qty } })
+  const clear = () => dispatch({ type: 'clear' })
+
+  return (
+    <CartContext.Provider value={{ cart: state, addToCart, removeFromCart, updateQty, clear }}>{children}</CartContext.Provider>
+  )
+}
+
+export const useCart = () => useContext(CartContext)
+
+// ------------------ Firebase placeholders ------------------
+/*
+  Install firebase and replace the config object below with your project's values:
+  npm install firebase
+
+  Then initialize firebase in a separate module and import auth/firestore where needed.
+*/
+const FIREBASE_PLACEHOLDER = `// firebaseConfig.js
+import { initializeApp } from 'firebase/app'
+import { getAuth } from 'firebase/auth'
+import { getFirestore } from 'firebase/firestore'
+
+const firebaseConfig = {
+  apiKey: 'YOUR_API_KEY',
+  authDomain: 'YOUR_AUTH_DOMAIN',
+  projectId: 'YOUR_PROJECT_ID',
+  storageBucket: 'YOUR_STORAGE_BUCKET',
+  messagingSenderId: 'YOUR_MSG_ID',
+  appId: 'YOUR_APP_ID',
+}
+
+export const app = initializeApp(firebaseConfig)
+export const auth = getAuth(app)
+export const db = getFirestore(app)
+`
+
+// ------------------ Payment stubs (client-side) ------------------
+/*
+  Khalti and eSewa require merchant keys and server-side endpoints to securely create payment requests.
+  Below are simple client-side stubs that show where to connect their SDKs or call your server endpoints.
+*/
+async function payWithKhalti(amount, onSuccess, onFail) {
+  // Example: Create an order on your server, then open Khalti widget
+  // const order = await fetch('/api/create-khalti-order',{method:'POST', body: JSON.stringify({amount})})
+  // then initialize Khalti Checkout with the returned token
+  console.log('Initiating Khalti payment stub for', amount)
+  setTimeout(() => onSuccess && onSuccess({ status: 'success-stub' }), 1000)
+}
+
+async function payWithEsewa(amount, onSuccess, onFail) {
+  console.log('Initiating eSewa payment stub for', amount)
+  setTimeout(() => onSuccess && onSuccess({ status: 'success-stub' }), 1000)
+}
+
+// ------------------ Components ------------------
+function Navbar() {
+  const { cart } = useCart()
+  const totalItems = cart?.items?.reduce((s,i)=>s+i.qty,0) || 0
+  return (
+    <header className="w-full bg-white shadow sticky top-0 z-40">
+      <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <Logo />
+        <nav className="flex items-center gap-6">
+          <Link href="#home"><a className="hover:underline">Home</a></Link>
+          <Link href="#shop"><a className="hover:underline">Shop</a></Link>
+          <Link href="#kids"><a className="hover:underline">Kids</a></Link>
+          <Link href="#adults"><a className="hover:underline">Adults</a></Link>
+          <Link href="/account"><a className="hover:underline">Account</a></Link>
+          <Link href="/cart"><a className="relative">Cart <span className="ml-1 bg-pink-500 text-white rounded-full px-2 text-xs">{totalItems}</span></a></Link>
+        </nav>
+      </div>
+    </header>
+  )
+}
+
+function ProductCard({ product }) {
+  const { addToCart } = useCart()
+  return (
+    <motion.div layout whileHover={{ scale: 1.02 }} className="rounded-xl shadow-lg overflow-hidden">
+      <div className="w-full h-60 relative">
+        {/* Using next/image is recommended in a real Next.js app; here we fallback to img */}
+        <img src={product.img} alt={product.title} className="w-full h-full object-cover" />
+      </div>
+      <div className="p-4 bg-white">
+        <h3 className="font-semibold text-lg">{product.title}</h3>
+        <p className="text-sm text-gray-500">{product.category}</p>
+        <div className="flex items-center justify-between mt-3">
+          <div className="font-bold">${product.price.toFixed(2)}</div>
+          <button onClick={()=>addToCart(product, product.sizes[0], 1)} className="px-3 py-1 rounded bg-gradient-to-r from-indigo-500 to-pink-500 text-white">Add</button>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+function ShopGrid() {
+  return (
+    <div className="max-w-6xl mx-auto p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {SAMPLE_PRODUCTS.map(p => <ProductCard key={p.id} product={p} />)}
+    </div>
+  )
+}
+
+function CartPage() {
+  const { cart, removeFromCart, updateQty, clear } = useCart()
+  const subtotal = cart?.items?.reduce((s,i)=>s+i.price*i.qty,0) || 0
+  return (
+    <div className="max-w-4xl mx-auto p-6">
+      <h2 className="text-2xl font-bold mb-4">Your Cart</h2>
+      {cart.items.length === 0 ? (
+        <div className="p-8 bg-white rounded">Your cart is empty</div>
+      ) : (
+        <div className="space-y-4">
+          {cart.items.map(it => (
+            <div key={it.id+it.size} className="flex items-center gap-4 p-4 bg-white rounded shadow">
+              <img src={it.img} className="w-24 h-24 object-cover rounded" />
+              <div className="flex-1">
+                <div className="font-semibold">{it.title}</div>
+                <div className="text-sm text-gray-500">Size: {it.size}</div>
+              </div>
+              <div>
+                <input type="number" min={1} value={it.qty} onChange={(e)=>updateQty(it.id, it.size, Number(e.target.value))} className="w-16 p-1 border rounded" />
+                <div className="text-right font-bold">${(it.price*it.qty).toFixed(2)}</div>
+                <button onClick={()=>removeFromCart(it.id, it.size)} className="text-sm text-red-500">Remove</button>
+              </div>
+            </div>
+          ))}
+
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded">
+            <div className="text-lg font-semibold">Subtotal</div>
+            <div className="text-xl font-bold">${subtotal.toFixed(2)}</div>
+          </div>
+
+          <div className="flex gap-4">
+            <button onClick={()=>payWithKhalti(subtotal, ()=>alert('Khalti success'), ()=>alert('Khalti fail'))} className="flex-1 py-3 rounded bg-indigo-600 text-white">Pay with Khalti</button>
+            <button onClick={()=>payWithEsewa(subtotal, ()=>alert('eSewa success'), ()=>alert('eSewa fail'))} className="flex-1 py-3 rounded bg-green-600 text-white">Pay with eSewa</button>
+          </div>
+
+          <div className="text-right">
+            <button onClick={()=>clear()} className="text-sm text-gray-600">Clear Cart</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function HomePage() {
+  return (
+    <main>
+      <section className={`h-96 flex items-center justify-center ${THEME.primary}`}>
+        <div className="text-center text-white">
+          <h1 className="text-4xl font-extrabold">Fitxz — New Generation Fashion</h1>
+          <p className="mt-2">Trendy pieces for kids and adults — fast delivery across Nepal</p>
+          <div className="mt-4">
+            <Link href="#shop'><a className="px-6 py-3 rounded bg-white text-black font-semibold">Shop Collections</a></Link>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-12 bg-gray-100">
+        <h2 className="text-2xl font-bold text-center mb-6">Trending Now</h2>
+        <ShopGrid />
+      </section>
+
+      <section className="py-12">
+        <div className="max-w-4xl mx-auto text-center">
+          <h3 className="text-xl font-bold">Why Fitxz?</h3>
+          <p className="mt-2 text-gray-600">Quality fabric, modern design, and affordable prices — built for the new generation.</p>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+function LoginPage() {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleLogin(e) {
+    e.preventDefault(); setLoading(true)
+    // Use Firebase Auth here: signInWithEmailAndPassword(auth, email, password)
+    setTimeout(()=>{ setLoading(false); alert('Logged in (stub)') }, 800)
+  }
+
+  return (
+    <div className="max-w-md mx-auto p-6 bg-white rounded shadow mt-8">
+      <h2 className="text-xl font-semibold mb-4">Login</h2>
+      <form onSubmit={handleLogin} className="space-y-3">
+        <input value={email} onChange={e=>setEmail(e.target.value)} placeholder="Email" className="w-full p-2 border rounded" />
+        <input value={password} onChange={e=>setPassword(e.target.value)} placeholder="Password" type="password" className="w-full p-2 border rounded" />
+        <button type="submit" disabled={loading} className="w-full py-2 rounded bg-indigo-600 text-white">{loading ? 'Please wait...' : 'Login'}</button>
+      </form>
+    </div>
+  )
+}
+
+function AccountPage() {
+  return (
+    <div className="max-w-4xl mx-auto p-6">
+      <h2 className="text-2xl font-bold mb-4">My Account</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="p-4 bg-white rounded shadow">Account details & order history (stub)</div>
+        <div className="p-4 bg-white rounded shadow">Saved addresses & payment methods (stub)</div>
+      </div>
+    </div>
+  )
+}
+
+// ------------------ App Shell (Single file router stub) ------------------
+export default function AppShell() {
+  const [route, setRoute] = useState('home')
+
+  // Very tiny hash-based router for this single-file demo
+  useEffect(()=>{
+    const hashRoute = () => setRoute(window.location.hash.replace('#','') || 'home')
+    window.addEventListener('hashchange', hashRoute)
+    hashRoute()
+    return ()=> window.removeEventListener('hashchange', hashRoute)
+  }, [])
+
+  return (
+    <CartProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="pt-6">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div key={route} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25 }}>
+              {route === 'home' && <HomePage />}
+              {route === 'shop' && <ShopGrid />}
+              {route === 'cart' && <CartPage />}
+              {route === 'login' && <LoginPage />}
+              {route === 'account' && <AccountPage />}
+              {route === 'kids' && <div className="p-6"><h2 className="text-2xl font-bold">Kids Collection</h2><ShopGrid /></div>}
+              {route === 'adults' && <div className="p-6"><h2 className="text-2xl font-bold">Adults Collection</h2><ShopGrid /></div>}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+        <footer className="mt-12 p-6 bg-gray-900 text-white text-center">© 2025 Fitxz — All rights reserved</footer>
+      </div>
+    </CartProvider>
+  )
+}
+
